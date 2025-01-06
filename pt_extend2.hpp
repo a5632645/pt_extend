@@ -15,6 +15,14 @@
 /* 启用协程嵌套 */
 #define PT_EXTEND_NEST_SUPPORT 1
 
+#define pt_extend_disable_irq()
+#define pt_extend_enable_irq()
+
+// --------------------------------------------------------------------------------
+// 协程上下文
+// --------------------------------------------------------------------------------
+namespace pt_extend {
+
 struct PtExtend {
     PtExtend* next_{};
     PtExtend* prev_{};
@@ -40,7 +48,22 @@ struct PtExtend {
 #endif
 };
 
+}
+
 namespace pt_extend {
+
+// --------------------------------------------------------------------------------
+// 引用链表
+// --------------------------------------------------------------------------------
+struct RefList {
+    PtExtend* head_;
+    PtExtend* tail_;
+};
+void AddToListEnd(RefList& list, PtExtend* pt);
+void RemoveFromList(RefList& list, PtExtend* pt);
+PtExtend* PopFront(RefList& list);
+
+extern RefList preAwaitList;
 
 /* config */
 static constexpr int kTickRate = 1000;
@@ -50,6 +73,7 @@ static constexpr int Ticks2Ms(int ticks) { return ticks * 1000 / kTickRate; }
 void RemoveFromReadyAddToWaitList(PtExtend* pt);
 void RemoveFromWaitListAndAddToReady(PtExtend* pt);
 void RemoveFromReadyList(PtExtend* pt);
+void AddToReadyList(PtExtend* pt);
 
 PtExtend* GetCurrentTask();
 pt* GetCurrentCallPt();
@@ -273,3 +297,46 @@ extern uint32_t nestingLevel;
     func(__VA_ARGS__);\
     pt_extend_call_end();
 #endif
+
+// --------------------------------------------------------------------------------
+// Event
+// --------------------------------------------------------------------------------
+namespace pt_extend {
+
+struct PtEvent {
+    volatile int32_t num_{};
+    RefList list_;
+
+    void Give() {
+        ++num_;
+        auto* p = PopFront(list_);
+        if (p) {
+            AddToReadyList(p);
+        }
+    }
+
+    void GiveFromISR() {
+        ++num_;
+        auto* p = PopFront(list_);
+        if (p) {
+            AddToListEnd(preAwaitList, p);
+        }
+    }
+};
+
+#define pt_event_take(e)\
+    do {\
+        for (;;) {\
+            volatile int32_t b = --(e).num_;\
+            if (b == (e).num_) {\
+                if (b < 0) {\
+                    pt_extend::RemoveFromReadyList(pt_extend::GetCurrentTask());\
+                    pt_extend::AddToListEnd(e.list_, pt_extend::GetCurrentTask());\
+                    pt_extend_yeild();\
+                    break;\
+                }\
+            }\
+        }\
+    } while(0)
+
+}

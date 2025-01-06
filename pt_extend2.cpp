@@ -8,12 +8,7 @@ namespace pt_extend {
 // --------------------------------------------------------------------------------
 // RefList
 // --------------------------------------------------------------------------------
-struct RefList {
-    PtExtend* head_;
-    PtExtend* tail_;
-};
-
-static void AddToListEnd(RefList& list, PtExtend* pt) {
+void AddToListEnd(RefList& list, PtExtend* pt) {
     pt->prev_ = list.tail_;
     pt->next_ = nullptr;
     if (list.tail_) {
@@ -24,7 +19,7 @@ static void AddToListEnd(RefList& list, PtExtend* pt) {
     list.tail_ = pt;
 }
 
-static void RemoveFromList(RefList& list, PtExtend* pt) {
+void RemoveFromList(RefList& list, PtExtend* pt) {
     auto* prev = pt->prev_;
     auto* next = pt->next_;
     if (prev) {
@@ -41,18 +36,35 @@ static void RemoveFromList(RefList& list, PtExtend* pt) {
     pt->next_ = nullptr;
 }
 
+PtExtend* PopFront(RefList& list) {
+    if (list.head_) {
+        auto* pt = list.head_;
+        list.head_ = pt->next_;
+        if (list.head_) {
+            list.head_->prev_ = nullptr;
+        } else {
+            list.tail_ = nullptr;
+        }
+        pt->next_ = nullptr;
+        pt->prev_ = nullptr;
+        return pt;
+    }
+    return nullptr;
+}
+
 // --------------------------------------------------------------------------------
 // Detail List
 // --------------------------------------------------------------------------------
 static RefList delayList = {nullptr, nullptr};
 static RefList readyList = {nullptr, nullptr};
 static RefList waitList = {nullptr, nullptr};
+RefList preAwaitList = {nullptr, nullptr};
 void RemoveFromReadyAddToWaitList(PtExtend* pt) {
     RemoveFromList(readyList, pt);
     AddToListEnd(delayList, pt);
 }
 
-static void AddToReadyList(PtExtend* pt) {
+void AddToReadyList(PtExtend* pt) {
     AddToListEnd(readyList, pt);
 }
 
@@ -243,6 +255,22 @@ void RunSchedulerNoPriority() {
             ptIdle.taskCode_(nullptr);
         }
 
+        /* add all pre await to ready end */
+        pt_extend_disable_irq();
+        if (preAwaitList.head_ != nullptr) {
+            if (readyList.tail_) {
+                readyList.tail_->next_ = preAwaitList.head_;
+                preAwaitList.head_->prev_ = readyList.tail_;
+            }
+            else {
+                readyList.head_ = preAwaitList.head_;
+            }
+            readyList.tail_ = preAwaitList.tail_;
+            preAwaitList.head_ = nullptr;
+            preAwaitList.tail_ = nullptr;
+        }
+        pt_extend_enable_irq();
+
         pCurrentTask = readyList.head_;
         while (pCurrentTask) {
             auto* next = pCurrentTask->next_;
@@ -290,10 +318,6 @@ pt* GetCurrentCallPt() {
 #else
     return &pCurrentTask->pt_;
 #endif
-}
-
-PtExtend *PopFront(RefList &list) {
-    return nullptr;
 }
 
 }

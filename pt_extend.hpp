@@ -16,7 +16,7 @@ struct PtExtend {
     PtExtend* next_{};
     PtExtend* prev_{};
 
-    struct pt pt_ = pt_init();
+    pt pt_ = pt_init();
     int32_t delay_{};
 #if PT_EXTEND_COUNT_TASK_TICKS
     uint32_t taskTicks_{}; /* task ticks in 1 second */
@@ -38,7 +38,7 @@ struct PtExtend {
 struct PtCallContext {
     PtCallContext* prev_;
 
-    struct pt pt_ = pt_init();
+    pt pt_ = pt_init();
 };
 #else
 struct PtCallContext {};

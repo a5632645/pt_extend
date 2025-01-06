@@ -1,4 +1,4 @@
-#include "pt_extend.hpp"
+#include "pt_extend2.hpp"
 #include <iostream>
 #include <format>
 #include <chrono>
@@ -41,7 +41,7 @@ void NestNestedFunc(void*) {
     pt_extend_yeild();
 
     std::cout << "[NestNestedFunc]: suspend\n";
-    pt_extend::AddDynamicTask("Resume", Resume, 0, pt_extend::GetCurrentTask());
+    pt_extend::AddDynamicTask("Resume", Resume, 0, 16, pt_extend::GetCurrentTask());
     pt_extend_suspend_self();
     std::cout << "[NestNestedFunc]: resume from resume\n";
 
@@ -64,9 +64,8 @@ void NestedFunc(void*) {
     std::cout << "[NestedFunc]: delay\n";
     pt_extend_delay(1000);
 
-    static PtCallContext ptFunc;
     std::cout << "[NestedFunc]: call Nested nested Func\n";
-    pt_extend_nest_call(ptFunc, NestNestedFunc, nullptr);
+    pt_extend_nest_call(NestNestedFunc, nullptr);
 
     std::cout << "[NestedFunc]: delay 2\n";
     pt_extend_delay(1000);
@@ -83,8 +82,7 @@ void Nested(void*) {
     pt_extend_delay(1000);
 
     std::cout << "[Nested]: call NestedFunc\n";
-    static PtCallContext ptFunc;
-    pt_extend_co_call(ptFunc, NestedFunc, nullptr);
+    pt_extend_co_call(NestedFunc, nullptr);
 
     std::cout << "[Nested]: delay 2\n";
     pt_extend_delay(1000);
@@ -112,7 +110,7 @@ int main() {
     std::jthread t1{SysTick};
     t1.detach();
 
-    pt_extend::AddDynamicTask("Nested", Nested, 0);
+    pt_extend::AddDynamicTask("Nested", Nested, 0, 16);
 
     pt_extend::RunSchedulerNoPriority();
 }

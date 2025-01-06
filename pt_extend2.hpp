@@ -180,30 +180,11 @@ extern uint32_t nestingLevel;
 // --------------------------------------------------------------------------------
 // Begin
 // --------------------------------------------------------------------------------
-/* 协程函数开始 */
-#define pt_extend_co_begin()\
-    do {\
-        pt_begin(&pt_extend::GetCurrentTask()->pt_);\
-    } while (0)
-
-#if PT_EXTEND_NEST_SUPPORT
-/* 协程嵌套函数开始 */
-#define pt_extend_nest_begin()\
+/* 协程/协程嵌套函数开始 */
+#define pt_extend_begin()\
     do {\
         pt_begin(pt_extend::GetCurrentCallPt());\
     } while (0)
-
-/* 通用开始 */
-#define pt_extend_begin()\
-    if (pt_extend::nestingLevel != 0) {\
-        pt_extend_nest_begin();\
-    }\
-    else {\
-        pt_extend_co_begin();\
-    }
-#else
-#define pt_extend_begin() pt_extend_co_begin()
-#endif
 
 // --------------------------------------------------------------------------------
 // End
@@ -241,8 +222,7 @@ extern uint32_t nestingLevel;
 
 #if PT_EXTEND_NEST_SUPPORT
 /* 协程嵌套函数结束 */
-#define pt_extend_nest_end()\
-    _pt_extend_unduplicate_end(pt_extend::GetCurrentCallPt());\
+#define pt_extend_nest_end() _pt_extend_unduplicate_end(pt_extend::GetCurrentCallPt());
 
 /* 通用结束 */
 #define pt_extend_end()\
@@ -259,48 +239,14 @@ extern uint32_t nestingLevel;
 // --------------------------------------------------------------------------------
 // Yield
 // --------------------------------------------------------------------------------
-/* 协程yield */
-#define pt_extend_co_yeild()\
-    pt_yield(&pt_extend::GetCurrentTask()->pt_);\
-
-#if PT_EXTEND_NEST_SUPPORT
-/* 协程嵌套yield */
-#define pt_extend_nest_yeild()\
-    _pt_extend_unduplicate_yield(pt_extend::GetCurrentCallPt());\
-
-/* 通用yield */
-#define pt_extend_yeild()\
-    if (pt_extend::nestingLevel != 0) {\
-        pt_extend_nest_yeild();\
-    }\
-    else {\
-        pt_extend_co_yeild();\
-    }
-#else
-#define pt_extend_yeild() pt_extend_co_yeild()
-#endif
+/* 协程/嵌套yield */
+#define pt_extend_yeild() pt_yield(pt_extend::GetCurrentCallPt());
 
 // --------------------------------------------------------------------------------
 // Wait
 // --------------------------------------------------------------------------------
-/* 协程等待 */
-#define pt_extend_co_wait(cond) pt_wait(&pt_extend::GetCurrentTask()->pt_, cond);
-
-#if PT_EXTEND_NEST_SUPPORT
-/* 协程嵌套等待 */
-#define pt_extend_nest_wait(cond) _pt_extend_unduplicate_wait(pt_extend::GetCurrentCallPt(), cond);
-
-/* 通用等待 */
-#define pt_extend_wait(cond)\
-    if (pt_extend::nestingLevel != 0) {\
-        pt_extend_nest_wait(cond);\
-    }\
-    else {\
-        pt_extend_co_wait(cond);\
-    }
-#else
-#define pt_extend_wait(cond) pt_extend_co_wait(cond)
-#endif
+/* 协程/嵌套等待 */
+#define pt_extend_wait(cond) pt_wait(pt_extend::GetCurrentCallPt(), cond);
 
 // --------------------------------------------------------------------------------
 // Suspend
@@ -312,6 +258,9 @@ extern uint32_t nestingLevel;
         pt_extend_yeild();\
     } while (0)
 
+// --------------------------------------------------------------------------------
+// Call
+// --------------------------------------------------------------------------------
 #if PT_EXTEND_NEST_SUPPORT
 /* 协程/协程函数调用协程函数 */
 #define pt_extend_call_begin()\

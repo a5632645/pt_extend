@@ -340,10 +340,14 @@ void PrintTaskTicks() {
 #endif
 
 pt* GetCurrentCallPt() {
+#if PT_EXTEND_NEST_SUPPORT
     if (nestingLevel == 0) {
         return &pCurrentTask->pt_;
     }
     return &pCurrentTask->ptCallStack[nestingLevel - 1];
+#else
+    return &pCurrentTask->pt_;
+#endif
 }
 
 }

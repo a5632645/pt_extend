@@ -313,29 +313,24 @@ extern uint32_t nestingLevel;
     } while (0)
 
 #if PT_EXTEND_NEST_SUPPORT
-/* 协程调用协程函数 */
-#define pt_extend_co_call(func, ...)\
-    do {\
-        pt_label(&pt_extend::GetCurrentTask()->pt_, PT_STATUS_BLOCKED);\
-        ++pt_extend::nestingLevel;\
-        func(__VA_ARGS__);\
-        if (pt_status(pt_extend::GetCurrentCallPt()) != PT_STATUS_FINISHED) {\
-            --pt_extend::nestingLevel;\
-            return;\
-        }\
-        --pt_extend::nestingLevel;\
-    } while (0);
-
-/* 协程函数调用协程函数 */
-#define pt_extend_nest_call(func, ...)\
+/* 协程/协程函数调用协程函数 */
+#define pt_extend_call_begin()\
     do {\
         pt_label(pt_extend::GetCurrentCallPt(), PT_STATUS_BLOCKED);\
         ++pt_extend::nestingLevel;\
-        func(__VA_ARGS__);\
+    } while(0)
+
+#define pt_extend_call_end()\
+    do {\
         if (pt_status(pt_extend::GetCurrentCallPt()) != PT_STATUS_FINISHED) {\
             --pt_extend::nestingLevel;\
             return;\
         }\
         --pt_extend::nestingLevel;\
-    } while(0);
+    } while(0)
+
+#define pt_extend_call(func, ...)\
+    pt_extend_call_begin();\
+    func(__VA_ARGS__);\
+    pt_extend_call_end();
 #endif

@@ -10,7 +10,7 @@
 /* 任务Tick计时 */
 #define PT_EXTEND_COUNT_TASK_TICKS 0
 /* 启用协程嵌套 */
-#define PT_EXTEND_NEST_SUPPORT 1
+#define PT_EXTEND_NEST_SUPPORT 0
 
 struct PtExtend {
     PtExtend* next_{};
@@ -332,7 +332,4 @@ extern uint32_t nestingLevel;
         }\
         pt_extend::ptCallContext = pt_extend::ptCallContext->prev_;\
     } while(0);
-#else
-#define pt_extend_co_call(ptCallCtx, func, ...) func(__VA_ARGS__)
-#define pt_extend_nest_call(ptCallCtx, func, ...) func(__VA_ARGS__)
 #endif

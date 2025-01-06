@@ -1,2 +1,4 @@
 # pt_extend
-protothreads extension
+protothreads extension  
+prioty is not usable  
+original work from https://github.com/zserge/pt

@@ -292,4 +292,8 @@ pt* GetCurrentCallPt() {
 #endif
 }
 
+PtExtend *PopFront(RefList &list) {
+    return nullptr;
+}
+
 }

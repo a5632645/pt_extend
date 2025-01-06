@@ -4,35 +4,51 @@
 #include <chrono>
 #include <thread>
 
-struct Queue {
-    int wpos{};
-    int rpos{};
-    int items[10]{};
+static void Resume(void* userData) {
+    pt_extend_begin();
+    std::cout << "[Resume]: begin\n";
 
-    bool IsFull() {
-        return (wpos + 1) % 10 == rpos;
-    }
+    std::cout << "[Resume]: delay\n";
+    pt_extend_delay(1000);
 
-    void Enqueue(int item) {
-        items[wpos] = item;
-        wpos = (wpos + 1) % 10;
-    }
+    std::cout << "[Resume]: resume\n";
+    pt_extend::ResumeTask(*reinterpret_cast<PtExtend*>(userData));
 
-    int Dequeue() {
-        int item = items[rpos];
-        rpos = (rpos + 1) % 10;
-        return item;
-    }
+    std::cout << "[Resume]: end\n";
+    pt_extend_end();
+}
 
-    bool IsEmpty() {
-        return wpos == rpos;
-    }
-};
-Queue q;
+static bool condition = false;
+static void ResumeCondition(void* userData) {
+    pt_extend_begin();
+    std::cout << "[ResumeCondition]: begin\n";
+
+    std::cout << "[ResumeCondition]: delay\n";
+    pt_extend_delay(1000);
+
+    std::cout << "[ResumeCondition]: resume\n";
+    condition = true;
+
+    std::cout << "[ResumeCondition]: end\n";
+    pt_extend_end();
+}
 
 void NestNestedFunc(void*) {
     pt_extend_begin();
     std::cout << "[NestNestedFunc]: begin\n";
+
+    std::cout << "[NestNestedFunc]: yeild\n";
+    pt_extend_yeild();
+
+    std::cout << "[NestNestedFunc]: suspend\n";
+    pt_extend::AddDynamicTask("Resume", Resume, 0, pt_extend::GetCurrentTask());
+    pt_extend_suspend_self();
+    std::cout << "[NestNestedFunc]: resume from resume\n";
+
+    std::cout << "[NestNestedFunc]: wait test\n";
+    pt_extend::AddDynamicTask("ResumeCondition", ResumeCondition, 0, nullptr);
+    pt_extend_wait(condition);
+    std::cout << "[NestNestedFunc]: resume from wait\n";
 
     std::cout << "[NestNestedFunc]: delay\n";
     pt_extend_delay(1000);
@@ -91,14 +107,10 @@ void SysTick() {
 }
 
 int main() {
+    std::cout << std::endl;
+
     std::jthread t1{SysTick};
     t1.detach();
-
-    // pt_extend::AddDynamicTask("F1", F1, 0);
-    // pt_extend::AddStaticTask(p2, "F2", F2, 1);
-    // pt_extend::AddStaticTask(p3, "F3", F3, 2);
-
-    // pt_extend::SuspendTask(p3);
 
     pt_extend::AddDynamicTask("Nested", Nested, 0);
 

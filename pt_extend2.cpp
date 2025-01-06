@@ -44,11 +44,12 @@ static void RemoveFromList(RefList& list, PtExtend* pt) {
 // --------------------------------------------------------------------------------
 // Detail List
 // --------------------------------------------------------------------------------
-static RefList waitList = {nullptr, nullptr};
+static RefList delayList = {nullptr, nullptr};
 static RefList readyList = {nullptr, nullptr};
+static RefList waitList = {nullptr, nullptr};
 void RemoveFromReadyAddToWaitList(PtExtend* pt) {
     RemoveFromList(readyList, pt);
-    AddToListEnd(waitList, pt);
+    AddToListEnd(delayList, pt);
 }
 
 static void AddToReadyList(PtExtend* pt) {
@@ -56,7 +57,7 @@ static void AddToReadyList(PtExtend* pt) {
 }
 
 void RemoveFromWaitListAndAddToReady(PtExtend* pt) {
-    RemoveFromList(waitList, pt);
+    RemoveFromList(delayList, pt);
     AddToReadyList(pt);
 }
 
@@ -72,7 +73,6 @@ void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void
     staticTCB.taskCode_ = code;
     staticTCB.userData_ = userData;
     staticTCB.flags.dynamic = 0;
-    staticTCB.flags.suspend = 0;
     staticTCB.flags.dynamicStack = 0;
     staticTCB.name_ = name;
     staticTCB.ptCallStack = ptCallStack;
@@ -88,7 +88,6 @@ PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), pt
     pt->taskCode_ = code;
     pt->userData_ = userData;
     pt->flags.dynamic = 1;
-    pt->flags.suspend = 0;
     pt->flags.dynamicStack = 0;
     pt->name_ = name;
     pt->ptCallStack = ptCallStack;
@@ -120,7 +119,6 @@ void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void
     staticTCB.taskCode_ = code;
     staticTCB.userData_ = userData;
     staticTCB.flags.dynamic = 0;
-    staticTCB.flags.suspend = 0;
     staticTCB.name_ = name;
     AddToReadyList(&staticTCB);
 }
@@ -134,7 +132,6 @@ PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), vo
     pt->taskCode_ = code;
     pt->userData_ = userData;
     pt->flags.dynamic = 1;
-    pt->flags.suspend = 0;
     pt->name_ = name;
     AddToReadyList(pt);
     return pt;
@@ -143,11 +140,13 @@ PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), vo
 #endif
 
 void SuspendTask(PtExtend& pt) {
-    pt.flags.suspend = 1;
+    RemoveFromReadyList(&pt);
+    AddToListEnd(waitList, &pt);
 }
 
 void ResumeTask(PtExtend& pt) {
-    pt.flags.suspend = 0;
+    RemoveFromList(waitList, &pt);
+    AddToReadyList(&pt);
 }
 
 // --------------------------------------------------------------------------------
@@ -181,7 +180,7 @@ void IdleTask(void*) {
         }
         clearTickCounter = 0;
 
-        t = waitList.head_;
+        t = delayList.head_;
         while (t) {
             t->taskTicksReal_ = t->taskTicks_;
             t->taskTicks_ = 0;
@@ -190,7 +189,7 @@ void IdleTask(void*) {
     }
 #endif
 
-    auto* pt = waitList.head_;
+    auto* pt = delayList.head_;
     while (pt) {
         auto* next = pt->next_;
         pt->delay_ -= tickEscape;
@@ -235,7 +234,7 @@ void SetCurrentTask(PtExtend& pt) {
 
 void RunSchedulerNoPriority() {
     for (;;) {
-        if (waitList.head_ == nullptr) {
+        if (delayList.head_ == nullptr) {
             tickEscape = 0;
         }
 
@@ -247,18 +246,16 @@ void RunSchedulerNoPriority() {
         pCurrentTask = readyList.head_;
         while (pCurrentTask) {
             auto* next = pCurrentTask->next_;
-            if (!pCurrentTask->flags.suspend) {
 #if PT_EXTEND_COUNT_TASK_TICKS
-                uint32_t tickBegin = tickEscape;
+            uint32_t tickBegin = tickEscape;
 #endif
-                pCurrentTask->taskCode_(pCurrentTask->userData_);
+            pCurrentTask->taskCode_(pCurrentTask->userData_);
 #if PT_EXTEND_COUNT_TASK_TICKS
-                uint32_t tickEnd = tickEscape;
-                if (pCurrentTask != nullptr) {
-                    pCurrentTask->taskTicks_ += tickEnd - tickBegin;
-                }
-#endif
+            uint32_t tickEnd = tickEscape;
+            if (pCurrentTask != nullptr) {
+                pCurrentTask->taskTicks_ += tickEnd - tickBegin;
             }
+#endif
             pCurrentTask = next;
         }
     }
@@ -274,7 +271,7 @@ void PrintTaskTicks() {
         pt = pt->next_;
     }
 
-    pt = waitList.head_;
+    pt = delayList.head_;
     while (pt) {
         std::cout << std::format("# name: {}, ticks: {}\n", pt->name_, pt->taskTicksReal_);
         pt = pt->next_;

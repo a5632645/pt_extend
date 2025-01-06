@@ -9,7 +9,7 @@
 #include "pt.h"
 
 /* 启动动态分配 */
-#define PT_EXTEND_ENABLE_DYNAMIC_ALLOC 0
+#define PT_EXTEND_ENABLE_DYNAMIC_ALLOC 1
 /* 任务Tick计时 */
 #define PT_EXTEND_COUNT_TASK_TICKS 0
 /* 启用协程嵌套 */
@@ -27,7 +27,6 @@ struct PtExtend {
     uint32_t taskTicksReal_{};
 #endif
     struct {
-        uint8_t suspend : 1;
         uint8_t dynamic : 1;
         uint8_t dynamicStack : 1;
     } flags;

@@ -52,28 +52,7 @@ void RemoveFromReadyAddToWaitList(PtExtend* pt) {
 }
 
 static void AddToReadyList(PtExtend* pt) {
-#if PT_EXTEND_ENABLE_PRIORITY
-    auto* pti = readyList.head_;
-    while (pti != nullptr && pti->prioty_ > pt->prioty_) {
-        pti = pti->next_;
-    }
-    if (pti == nullptr) {
-        AddToListEnd(readyList, pt);
-    }
-    else {
-        pt->next_ = pti;
-        if (pti->prev_) {
-            pti->prev_->next_ = pt;
-        }
-        pt->prev_ = pti->prev_;
-        pti->prev_ = pt;
-        if (readyList.head_ == pti) {
-            readyList.head_ = pt;
-        }
-    }
-#else
     AddToListEnd(readyList, pt);
-#endif
 }
 
 void RemoveFromWaitListAndAddToReady(PtExtend* pt) {
@@ -89,10 +68,7 @@ void RemoveFromReadyList(PtExtend* pt) {
 // Task
 // --------------------------------------------------------------------------------
 #if PT_EXTEND_NEST_SUPPORT
-void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void* userData), uint32_t prioty, pt* ptCallStack, void* userData) {
-#if PT_EXTEND_ENABLE_PRIORITY
-    staticTCB.prioty_ = prioty;
-#endif
+void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void* userData), pt* ptCallStack, void* userData) {
     staticTCB.taskCode_ = code;
     staticTCB.userData_ = userData;
     staticTCB.flags.dynamic = 0;
@@ -103,15 +79,12 @@ void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void
     AddToReadyList(&staticTCB);
 }
 
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
-PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), uint32_t prioty, pt* ptCallStack, void* userData) {
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
+PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), pt* ptCallStack, void* userData) {
     auto* pt = new(std::nothrow) PtExtend;
     if (!pt) {
         return nullptr;
     }
-#if PT_EXTEND_ENABLE_PRIORITY
-    pt->prioty_ = prioty;
-#endif
     pt->taskCode_ = code;
     pt->userData_ = userData;
     pt->flags.dynamic = 1;
@@ -123,7 +96,7 @@ PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), ui
     return pt;
 }
 
-PtExtend* AddDynamicTask(std::string_view name, void (*code)(void *userData), uint32_t prioty, uint32_t stackDepth, void *userData) {
+PtExtend* AddDynamicTask(std::string_view name, void (*code)(void *userData), uint32_t stackDepth, void *userData) {
     auto* stack = new(std::nothrow) pt[stackDepth];
     if (stack == nullptr) {
         return nullptr;
@@ -132,7 +105,7 @@ PtExtend* AddDynamicTask(std::string_view name, void (*code)(void *userData), ui
         stack[i] = pt_init();
     }
 
-    auto* pt = AddDynamicTask(name, code, prioty, stack, userData);
+    auto* pt = AddDynamicTask(name, code, stack, userData);
     if (pt == nullptr) {
         delete[] stack;
         return nullptr;
@@ -143,10 +116,7 @@ PtExtend* AddDynamicTask(std::string_view name, void (*code)(void *userData), ui
 
 #endif
 #else
-void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void* userData), uint32_t prioty, void* userData) {
-#if PT_EXTEND_ENABLE_PRIORITY
-    staticTCB.prioty_ = prioty;
-#endif
+void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void* userData), void* userData) {
     staticTCB.taskCode_ = code;
     staticTCB.userData_ = userData;
     staticTCB.flags.dynamic = 0;
@@ -155,15 +125,12 @@ void AddStaticTask(PtExtend& staticTCB, std::string_view name, void (*code)(void
     AddToReadyList(&staticTCB);
 }
 
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
-PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), uint32_t prioty, void* userData) {
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
+PtExtend* AddDynamicTask(std::string_view name, void (*code)(void* userData), void* userData) {
     auto* pt = new(std::nothrow) PtExtend;
     if (!pt) {
         return nullptr;
     }
-#if PT_EXTEND_ENABLE_PRIORITY
-    pt->prioty_ = prioty;
-#endif
     pt->taskCode_ = code;
     pt->userData_ = userData;
     pt->flags.dynamic = 1;
@@ -246,23 +213,11 @@ static PtExtend ptIdle = {
 static PtExtend* pCurrentTask = nullptr;
 uint32_t nestingLevel = 0;
 
-#if PT_EXTEND_ENABLE_PRIORITY
-PtExtend& GetPriotyTask() {
-    if (waitList.head_ == nullptr) {
-        tickEscape = 0;
-    }
-    if (tickEscape > 0 || readyList.head_ == nullptr) {
-        return ptIdle;
-    }
-    return *readyList.head_;
-}
-#endif
-
 PtExtend *GetCurrentTask() {
     return pCurrentTask;
 }
 
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
 void DynamicDeleteCurrent() {
     #if PT_EXTEND_NEST_SUPPORT
     if (pCurrentTask->flags.dynamicStack) {
@@ -277,16 +232,6 @@ void DynamicDeleteCurrent() {
 void SetCurrentTask(PtExtend& pt) {
     pCurrentTask = &pt;
 }
-
-#if PT_EXTEND_ENABLE_PRIORITY
-void RunScheduler() {
-    for (;;) {
-        auto& task = GetPriotyTask();
-        pCurrentTask = &task;
-        task.taskCode_();
-    }
-}
-#endif
 
 void RunSchedulerNoPriority() {
     for (;;) {

@@ -8,10 +8,8 @@
 #include <string_view>
 #include "pt.h"
 
-/* 还不能使用 */
-#define PT_EXTEND_ENABLE_PRIORITY 0
-/* 启动TCB动态分配 */
-#define PT_EXTEND_ENABLE_DYNAMIC_TASK 1
+/* 启动动态分配 */
+#define PT_EXTEND_ENABLE_DYNAMIC_ALLOC 0
 /* 任务Tick计时 */
 #define PT_EXTEND_COUNT_TASK_TICKS 0
 /* 启用协程嵌套 */
@@ -23,6 +21,7 @@ struct PtExtend {
 
     pt pt_ = pt_init();
     int32_t delay_{};
+
 #if PT_EXTEND_COUNT_TASK_TICKS
     uint32_t taskTicks_{}; /* task ticks in 1 second */
     uint32_t taskTicksReal_{};
@@ -32,9 +31,7 @@ struct PtExtend {
         uint8_t dynamic : 1;
         uint8_t dynamicStack : 1;
     } flags;
-#if PT_EXTEND_ENABLE_PRIORITY
-    uint32_t prioty_{};
-#endif
+
     void(*taskCode_)(void*);
     void* userData_;
     std::string_view name_;
@@ -55,36 +52,30 @@ void RemoveFromReadyAddToWaitList(PtExtend* pt);
 void RemoveFromWaitListAndAddToReady(PtExtend* pt);
 void RemoveFromReadyList(PtExtend* pt);
 
-#if PT_EXTEND_ENABLE_PRIORITY
-PtExtend& GetPriotyTask();
-#endif
 PtExtend* GetCurrentTask();
 pt* GetCurrentCallPt();
 
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
 void DynamicDeleteCurrent();
 #endif
 void SetCurrentTask(PtExtend& pt);
 
 /* public */
 void TimerTick(uint32_t tickPlus);
-#if PT_EXTEND_ENABLE_PRIORITY
-void RunScheduler();
-#endif
 /* 可以使用pt_extend_wait直接等待普通变量 */
 void RunSchedulerNoPriority();
 
 #if PT_EXTEND_NEST_SUPPORT
-void AddStaticTask(PtExtend& staticTCB, std::string_view name, void(*code)(void* userData), uint32_t prioty, pt* ptCallStack, void* userData = nullptr);
+void AddStaticTask(PtExtend& staticTCB, std::string_view name, void(*code)(void* userData), pt* ptCallStack, void* userData = nullptr);
 #else
-void AddStaticTask(PtExtend& staticTCB, std::string_view name, void(*code)(void* userData), uint32_t prioty, void* userData = nullptr);
+void AddStaticTask(PtExtend& staticTCB, std::string_view name, void(*code)(void* userData), void* userData = nullptr);
 #endif
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
 #if PT_EXTEND_NEST_SUPPORT
-PtExtend* AddDynamicTask(std::string_view name, void(*code)(void* userData), uint32_t prioty, pt* ptCallStack, void* userData = nullptr);
-PtExtend* AddDynamicTask(std::string_view name, void(*code)(void* userData), uint32_t prioty, uint32_t stackDepth, void* userData = nullptr);
+PtExtend* AddDynamicTask(std::string_view name, void(*code)(void* userData), pt* ptCallStack, void* userData = nullptr);
+PtExtend* AddDynamicTask(std::string_view name, void(*code)(void* userData), uint32_t stackDepth, void* userData = nullptr);
 #else
-PtExtend* AddDynamicTask(std::string_view name, void(*code)(void* userData), uint32_t prioty, void* userData = nullptr);
+PtExtend* AddDynamicTask(std::string_view name, void(*code)(void* userData), void* userData = nullptr);
 #endif
 #endif
 
@@ -197,7 +188,7 @@ extern uint32_t nestingLevel;
     } while (0)
 
 /* 动态创建的协程函数结束 */
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
 #define pt_extend_co_dynamic_end()\
     do {\
         pt_extend::RemoveFromReadyList(pt_extend::GetCurrentTask());\
@@ -206,7 +197,7 @@ extern uint32_t nestingLevel;
 #endif
 
 /* 协程函数结束 */
-#if PT_EXTEND_ENABLE_DYNAMIC_TASK
+#if PT_EXTEND_ENABLE_DYNAMIC_ALLOC
 #define pt_extend_co_end()\
     do {\
         if (pt_extend::GetCurrentTask()->flags.dynamic) {\
@@ -217,7 +208,7 @@ extern uint32_t nestingLevel;
     } while (0)
 #else
 #define pt_extend_co_end()\
-    pt_extend_static_end()
+    pt_extend_co_static_end()
 #endif
 
 #if PT_EXTEND_NEST_SUPPORT
